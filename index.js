@@ -14,7 +14,7 @@ exports.handler = (event, context, callback) => {
 
 	if (fnConfig) {
         processEvent(event, context, callback);
-    } else {
+        } else {
         var encryptedBuf = new Buffer(fnEncryptedConfig, 'base64');
         var cipherText = { CiphertextBlob: encryptedBuf };
 
@@ -30,6 +30,7 @@ exports.handler = (event, context, callback) => {
     }
 
 callback(null, 'function executed successfully');
+
 };
 
 var processEvent = function (event, context, callback) {
@@ -37,10 +38,10 @@ var processEvent = function (event, context, callback) {
 	console.log("processEvent Function Started");
 	console.log("function config " + fnConfig.consumer_key);
 
-    //var consumer_key1 = "'"+fnConfig.consumer_key+"'";
-    //var consumer_secret1 = "'"+fnConfig.consumer_secret+"'";
-    //var access_token_key1 = "'"+fnConfig.access_token_key+"'";
-    //var access_token_secret1 = "'"+fnConfig.access_token_secret+"'";
+        //var consumer_key1 = "'"+fnConfig.consumer_key+"'";
+        //var consumer_secret1 = "'"+fnConfig.consumer_secret+"'";
+        //var access_token_key1 = "'"+fnConfig.access_token_key+"'";
+        //var access_token_secret1 = "'"+fnConfig.access_token_secret+"'";
 
 	
 	var client = new Twitter({
