@@ -1,0 +1,11 @@
+{
+  "name": "serverless-twitterbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": ""
+  },
+  "author": "Vishal Pawar <openstack.vishal@gmail.com>",
+  "license": "ISC"
+}
