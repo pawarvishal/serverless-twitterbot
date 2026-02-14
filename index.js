@@ -1,74 +1,94 @@
 'use strict';
-var Twitter = require('twitter');
-var moment = require('moment-timezone');
-var AWS = require('aws-sdk');
-var kms = new AWS.KMS();
-var fnConfig;
+const { KMSClient, DecryptCommand } = require('@aws-sdk/client-kms');
+const { TwitterApi } = require('twitter-api-v2');
 
-var fnEncryptedConfig = ''; //encrypted blob
+const kms = new KMSClient({});
+const fnEncryptedConfig = process.env.FN_ENCRYPTED_CONFIG || ''; // encrypted base64 blob
 
-var fnConfig;
+let fnConfig;
+let twitterClient;
 
+function getDateParts() {
+  const now = new Date();
+  const day = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'long'
+  }).format(now);
+  const dateandtime = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(now);
 
-exports.handler = (event, context, callback) => {
+  return { day, dateandtime };
+}
 
-	if (fnConfig) {
-        processEvent(event, context, callback);
-        } else {
-        var encryptedBuf = new Buffer(fnEncryptedConfig, 'base64');
-        var cipherText = { CiphertextBlob: encryptedBuf };
+async function loadConfig() {
+  if (fnConfig) {
+    return fnConfig;
+  }
 
-        kms.decrypt(cipherText, function (err, data) {
-            if (err) {
-                console.log("Decrypt error: " + err);
-                callback(err);
-            } else {
-                fnConfig = JSON.parse(data.Plaintext.toString('ascii'));
-                processEvent(event, context, callback);
-            }
-        });
+  if (!fnEncryptedConfig) {
+    throw new Error('Missing FN_ENCRYPTED_CONFIG environment variable');
+  }
+
+  const decrypted = await kms.send(new DecryptCommand({
+    CiphertextBlob: Buffer.from(fnEncryptedConfig, 'base64')
+  }));
+
+  fnConfig = JSON.parse(Buffer.from(decrypted.Plaintext).toString('utf8'));
+  return fnConfig;
+}
+
+async function getTwitterClient() {
+  if (twitterClient) {
+    return twitterClient;
+  }
+
+  const cfg = await loadConfig();
+  const requiredKeys = ['consumer_key', 'consumer_secret', 'access_token_key', 'access_token_secret'];
+  const missingKeys = requiredKeys.filter((key) => !cfg[key]);
+
+  if (missingKeys.length > 0) {
+    throw new Error('Missing required Twitter config keys: ' + missingKeys.join(', '));
+  }
+
+  twitterClient = new TwitterApi({
+    appKey: cfg.consumer_key,
+    appSecret: cfg.consumer_secret,
+    accessToken: cfg.access_token_key,
+    accessSecret: cfg.access_token_secret
+  });
+
+  return twitterClient;
+}
+
+async function processEvent() {
+  console.log('processEvent started');
+
+  const client = await getTwitterClient();
+  const dateParts = getDateParts();
+  const status = 'Its ' + dateParts.day + ', ' + dateParts.dateandtime + ' IST, Hello People! Happy tweeting!';
+
+  await client.readWrite.v2.tweet(status);
+  console.log('tweet sent ' + dateParts.dateandtime);
+}
+
+exports.handler = async (event, context, callback) => {
+  try {
+    await processEvent(event, context);
+    if (typeof callback === 'function') {
+      callback(null, 'function executed successfully');
+      return;
     }
-
-callback(null, 'function executed successfully');
-
-};
-
-var processEvent = function (event, context, callback) {
-
-	console.log("processEvent Function Started");
-	console.log("function config " + fnConfig.consumer_key);
-
-        //var consumer_key1 = "'"+fnConfig.consumer_key+"'";
-        //var consumer_secret1 = "'"+fnConfig.consumer_secret+"'";
-        //var access_token_key1 = "'"+fnConfig.access_token_key+"'";
-        //var access_token_secret1 = "'"+fnConfig.access_token_secret+"'";
-
-	
-	var client = new Twitter({
-	consumer_key: fnConfig.consumer_key,
-	consumer_secret: fnConfig.consumer_secret,
-	access_token_key: fnConfig.access_token_key,
-	access_token_secret: fnConfig.access_token_secret
-	});
-
-
-
-	console.log("Client Created Successfully" + client.toString());
-
-	var dateandtime = moment().tz("Asia/Kolkata").format('MMMM Do YYYY');
-	var day = moment().tz("Asia/Kolkata").format('dddd');
-
-	console.log("Its "+day+", "+dateandtime+" IST, Hello People! Happy tweeting!");
-
-	var demotweet = {status: 'Its '+day+', '+dateandtime+' IST, Hello People! Happy tweeting!'}
-
-	client.post('statuses/update', demotweet,  function(error, tweet, response) {
-	if(error) throw error;
-	console.log(tweet);  // Tweet body.
-	console.log(response);  // Raw response object.
-	});
-
-
-	console.log('tweet send ' + dateandtime);
-
+    return 'function executed successfully';
+  } catch (err) {
+    console.error('handler error:', err);
+    if (typeof callback === 'function') {
+      callback(err);
+      return;
+    }
+    throw err;
+  }
 };
