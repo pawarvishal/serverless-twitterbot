@@ -1,11 +1,18 @@
 {
   "name": "serverless-twitterbot",
   "version": "1.0.0",
-  "description": "",
+  "description": "Serverless Twitter bot using AWS Lambda and KMS",
   "main": "index.js",
   "scripts": {
-    "test": ""
+    "test": "node -e \"console.log('No tests configured')\""
   },
   "author": "Vishal Pawar <openstack.vishal@gmail.com>",
-  "license": "ISC"
+  "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "^3.883.0",
+    "twitter-api-v2": "^1.27.0"
+  }
 }
